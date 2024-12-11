@@ -1,7 +1,7 @@
 {
   "name": "@deeptimes/deployer",
   "type": "module",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "used to package the nuxt project locally, quickly deploy it to the remote server, and automatically restart the pm2 application.",
   "author": "leosin@qq.com",
   "license": "MIT",
