@@ -1,7 +1,7 @@
 import type { DeployToolConfig } from '../types'
 
 import { exec } from 'node:child_process'
-import { stat } from 'node:fs/promises'
+import { mkdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { promisify } from 'node:util'
@@ -20,6 +20,10 @@ const execAsync = promisify(exec)
 
 export async function compressFiles(cfgs: DeployToolConfig) {
   try {
+    // 确保临时目录存在
+    const tempPath = path.join(process.cwd(), cfgs.temp)
+    await mkdir(tempPath, { recursive: true })
+
     /* 排除文件 */
     const excludesParams = cfgs.excludes.map(item => `--exclude='${item}'`).join(' ')
 
