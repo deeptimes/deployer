@@ -1,0 +1,50 @@
+{
+  "name": "@deeptimes/deployer",
+  "type": "module",
+  "version": "1.0.6",
+  "description": "",
+  "author": "",
+  "license": "MIT",
+  "keywords": [],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "nuxt-deployer": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@inquirer/confirm": "^5.1.0",
+    "@inquirer/core": "^10.1.1",
+    "@inquirer/prompts": "^7.2.0",
+    "@inquirer/select": "^4.0.3",
+    "archiver": "^7.0.1",
+    "chalk": "^5.3.0",
+    "execa": "^9.5.2",
+    "fs-extra": "^11.2.0",
+    "ssh2": "^1.16.0"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^3.11.2",
+    "@types/node": "^20.17.9",
+    "@types/ssh2": "^1.15.1",
+    "eslint": "^9.16.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}
