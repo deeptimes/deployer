@@ -1,0 +1,9 @@
+node_modules/
+src/
+tests/
+logs/
+tsconfig.json
+eslint.config.js
+tsup.config.ts
+deploy.config.js
+.gitignore
