@@ -32,7 +32,7 @@
     "build": "tsup",
     "type-check": "tsc --noEmit",
     "deployer": "nuxt-deployer",
-    "release": "pnpm run clean && pnpm run build && pnpm publish --access public",
+    "release": "pnpm run build && pnpm publish --access public",
     "patch": "npm version patch",
     "minor": "npm version minor",
     "major": "npm version major"
