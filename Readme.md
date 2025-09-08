@@ -44,3 +44,10 @@ add`"deployer": "nuxt-deployer"` to your `package.json`
 ```
 pnpm deployer
 ```
+
+### Todo
+本地压缩包时，清理mac自带的前缀文件
+```
+._*
+.DS_Store
+```
