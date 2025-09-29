@@ -1,3 +1,4 @@
+/*  */
 const config = {
   ssh: {
     host: '43.173.125.136',

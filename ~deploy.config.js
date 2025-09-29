@@ -6,6 +6,10 @@ const config = {
     privateKey: '~/.ssh/id_rsa',
     readyTimeout: 10000,
   },
+  envInit: [
+    'source /etc/profile',
+    'source ~/.nvm/nvm.sh',
+  ],
   remote: {
     root: '/www/web',
     site: '',
