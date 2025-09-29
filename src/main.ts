@@ -26,7 +26,7 @@ export default async function main() {
     /* 欢迎标题 */
     welcome(config.package.name)
 
-    const ssh = await SSHClient.create()
+    const ssh = await SSHClient.create(config)
 
     /* 建立远程连接 */
     await ssh.connect()

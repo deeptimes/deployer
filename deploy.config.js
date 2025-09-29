@@ -1,14 +1,18 @@
 const config = {
   ssh: {
-    host: 'localhost',
+    host: '43.173.125.136',
     port: 22,
     username: 'root',
-    privateKey: '~/.ssh/id_rsa',
+    privateKey: '~/.ssh/ezdoc_id_rsa_git',
     readyTimeout: 10000,
   },
+  envInit: [
+    'source /etc/profile',
+    'source ~/.nvm/nvm.sh',
+  ],
   remote: {
     root: '/www/web',
-    site: 'www_temp_com',
+    site: 'tacvita.com/web',
   },
 }
 

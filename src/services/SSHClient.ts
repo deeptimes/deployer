@@ -1,16 +1,16 @@
 import type { Buffer } from 'node:buffer'
 import type { ConnectConfig, SFTPWrapper } from 'ssh2'
-import type { CommandError, CommandResult, SSHConfig } from '../types/ssh'
+import type { CommandError, CommandResult, DeployToolConfig, SSHConfig } from '../types'
 
 import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { Client } from 'ssh2'
-import { loadConfig } from '../config'
 
 export class SSHClient {
   private conn: Client
   private config: ConnectConfig
+  private envInit: string[]
 
   /* 解析主目录 */
   private resolveHome(filePath: string): string {
@@ -20,18 +20,18 @@ export class SSHClient {
     return filePath
   }
 
-  private constructor(cfgSSH: SSHConfig) {
+  private constructor(cfgSSH: SSHConfig, envInit: string[]) {
     this.conn = new Client()
     this.config = {
       ...cfgSSH,
       privateKey: readFileSync(this.resolveHome(cfgSSH.privateKey)),
     }
+    this.envInit = envInit.filter(cmd => Boolean(cmd?.trim()))
   }
 
   /* 静态工厂方法创建实例 */
-  public static async create(): Promise<SSHClient> {
-    const deployConfig = await loadConfig()
-    return new SSHClient(deployConfig.ssh)
+  public static async create(config: DeployToolConfig): Promise<SSHClient> {
+    return new SSHClient(config.ssh, config.envInit || [])
   }
 
   /* 建立连接 */
@@ -53,7 +53,8 @@ export class SSHClient {
   /* 执行远程连接命令 */
   public execCommand(command: string): Promise<{ stdout: string, stderr: string, code: number } | CommandError> {
     return new Promise((resolve, reject) => {
-      this.conn.exec(command, (err, stream) => {
+      const commandPrefix = this.envInit.length > 0 ? `${this.envInit.join(' && ')} && ` : ''
+      this.conn.exec(`${commandPrefix}${command}`, (err, stream) => {
         if (err) {
           reject(new Error(err.message))
           return

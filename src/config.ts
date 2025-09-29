@@ -40,6 +40,7 @@ export async function loadConfig(): Promise<DeployToolConfig> {
         privateKey: '~/.ssh/id_rsa',
         readyTimeout: 20000,
       },
+      envInit: [],
       temp: 'temp',
       output: '.output',
       dist: 'dist.tar.gz',

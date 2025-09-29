@@ -30,6 +30,7 @@ export interface DeployToolConfig {
   dist: string
   excludes: string[]
   package: Package
+  envInit: string[]
   ssh: SSHConfig
   remote: {
     root: string
