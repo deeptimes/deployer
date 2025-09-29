@@ -7,6 +7,75 @@ import { printSeparator } from './utils/helper'
 export async function getOptions(ssh, config: DeployToolConfig): Promise<Options> {
   const options = {} as Options
 
+  const remoteRoot = config.remote?.root?.replace(/\/+$/, '')
+  const remoteSite = config.remote?.site?.replace(/^\/+/, '')
+  const remoteDir = remoteSite ? `${remoteRoot}/${remoteSite}` : remoteRoot
+
+  const formatDateTag = (): string => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    return `test-${year}${month}${day}`
+  }
+
+  const ensureRemoteDirConfigured = () => {
+    if (!remoteRoot) {
+      throw new Error('远程目录未在配置中设置，请检查 deploy.config.js 的 remote.root')
+    }
+    return remoteDir || remoteRoot
+  }
+
+  /* 0.开始部署 / 测试目录 */
+  while (true) {
+    const action = await select({
+      message: '请选择部署前操作',
+      choices: [
+        { name: '开始部署', value: 'deploy' },
+        { name: '测试目录', value: 'test-dir' },
+      ],
+    }, { clearPromptOnDone: true })
+
+    if (action === 'deploy') {
+      break
+    }
+
+    if (action === 'test-dir') {
+      const targetDir = ensureRemoteDirConfigured()
+      const testFile = formatDateTag()
+      const remoteFile = `${targetDir}/${testFile}`
+
+      const createResult = await ssh.execCommand(`cd "${targetDir}" && touch "${testFile}"`)
+      if (createResult instanceof Error) {
+        const errorResult = createResult as CommandError
+        const details = errorResult.stderr || errorResult.stdout || errorResult.message
+        throw new Error(`测试目录失败: ${details || '请检查远程目录是否存在'}`)
+      }
+
+      console.log(chalk.cyan(`已在远程目录 ${targetDir} 创建测试文件 ${testFile}`))
+
+      const confirmed = await confirm({
+        message: `请在服务器确认 ${remoteFile} 是否存在，确认无误请输入 Y 继续`,
+        default: true,
+      }, { clearPromptOnDone: true })
+
+      const cleanupResult = await ssh.execCommand(`rm -f "${remoteFile}"`)
+      if (cleanupResult instanceof Error) {
+        const errorResult = cleanupResult as CommandError
+        const details = errorResult.stderr || errorResult.stdout || errorResult.message
+        throw new Error(`删除测试文件失败: ${details || '请手动清理远程 test 文件'}`)
+      }
+
+      console.log(chalk.gray(`已移除远程测试文件 ${remoteFile}`))
+
+      if (confirmed) {
+        break
+      }
+
+      console.log(chalk.yellow('未确认目录，请重新选择操作。'))
+    }
+  }
+
   /* 1.渲染模式 */
   options.render = await select({
     message: '请选择渲染模式',
