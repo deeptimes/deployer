@@ -24,14 +24,21 @@ export async function compressFiles(cfgs: DeployToolConfig) {
     const tempPath = path.join(process.cwd(), cfgs.temp)
     await mkdir(tempPath, { recursive: true })
 
-    /* 排除文件 */
-    const excludesParams = cfgs.excludes.map(item => `--exclude='${item}'`).join(' ')
+    const defaultExcludes = ['.DS_Store', '._*', '__MACOSX']
+    const excludes = Array.from(new Set([...(cfgs.excludes || []), ...defaultExcludes]))
+    const excludesParams = excludes
+      .filter(Boolean)
+      .map((pattern) => {
+        const escaped = pattern.replace(/'/g, `'\\''`)
+        return `--exclude='${escaped}'`
+      })
+      .join(' ')
 
     /* 构建完整的输出路径 */
     const distFilePath = path.join(process.cwd(), cfgs.temp, cfgs.dist)
 
     /* 构建压缩命令，不包含目录名 */
-    const command = `tar -czf ${distFilePath} ${excludesParams} -C ${cfgs.output} .`
+    const command = `tar -czf '${distFilePath}' ${excludesParams} -C '${cfgs.output}' .`
 
     /* 执行压缩命令 */
     const { stdout, stderr } = await execAsync(command)

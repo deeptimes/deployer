@@ -44,7 +44,7 @@ export async function loadConfig(): Promise<DeployToolConfig> {
       temp: 'temp',
       output: '.output',
       dist: 'dist.tar.gz',
-      excludes: ['.DS_Store', '._.DS_Store'],
+      excludes: ['.DS_Store', '._*', '__MACOSX'],
       package: pkgJson,
       remote: {
         root: '/www/web',
