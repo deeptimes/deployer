@@ -5,7 +5,6 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { promisify } from 'node:util'
-import chalk from 'chalk'
 
 const execAsync = promisify(exec)
 
@@ -13,7 +12,7 @@ const execAsync = promisify(exec)
 export async function buildProject(config: DeployToolConfig, opts) {
   try {
     /* 根据选项决定执行的命令 */
-    const command = opts.render === 'ssr' ? 'nuxt build' : 'nuxt generate'
+    const command = opts.render === 'ssr' ? 'pnpm build' : 'pnpm ssg'
 
     // 创建Build临时目录(存放日志和压缩包)
     await mkdir(config.temp, { recursive: true })
