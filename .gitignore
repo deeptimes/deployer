@@ -10,3 +10,5 @@ logs
 .nitro
 .cache
 deploy.config.js
+.codex
+docs
