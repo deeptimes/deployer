@@ -40,8 +40,13 @@ export async function compressFiles(cfgs: DeployToolConfig) {
     /* 构建压缩命令，不包含目录名 */
     const command = `tar -czf '${distFilePath}' ${excludesParams} -C '${cfgs.output}' .`
 
-    /* 执行压缩命令 */
-    const { stdout, stderr } = await execAsync(command)
+    /* 执行压缩命令。macOS tar 默认可能把扩展属性写成 ._* AppleDouble 文件。 */
+    const { stderr } = await execAsync(command, {
+      env: {
+        ...process.env,
+        COPYFILE_DISABLE: '1',
+      },
+    })
 
     /* 反馈信息 */
     if (stderr) {
