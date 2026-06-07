@@ -1,10 +1,9 @@
-/*  */
 const config = {
   ssh: {
-    host: '43.173.125.136',
+    host: 'localhost',
     port: 22,
     username: 'root',
-    privateKey: '~/.ssh/ezdoc_id_rsa_git',
+    privateKey: '~/.ssh/id_rsa',
     readyTimeout: 10000,
   },
   envInit: [
@@ -13,7 +12,7 @@ const config = {
   ],
   remote: {
     root: '/www/web',
-    site: 'tacvita.com/web',
+    site: '',
   },
 }
 
