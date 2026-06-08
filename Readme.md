@@ -76,12 +76,59 @@ nuxter init
 2. 自动识别包管理器
 3. 询问项目名称
 4. 选择构建模式：SSR / Static / Custom
-5. 填写构建命令和输出目录
+5. 从当前 `package.json` 的 `scripts` 中选择构建命令，或输入自定义命令
 6. 填写 SSH 信息
 7. 填写服务器远程根目录
 8. SSR 模式下填写 PM2 应用名
 9. 生成 .nuxter/config.json
 ```
+
+构建命令选择会优先展示：
+
+```text
+build
+build:*
+generate
+ssg
+其他 scripts
+自定义命令
+```
+
+例如当前项目包含：
+
+```json
+{
+  "scripts": {
+    "build": "nuxt build --dotenv .env.production",
+    "build:test": "nuxt build --dotenv .env.test",
+    "ssg": "nuxt generate"
+  }
+}
+```
+
+初始化时会显示类似：
+
+```text
+build       -> nuxt build --dotenv .env.production
+build:test  -> nuxt build --dotenv .env.test
+ssg         -> nuxt generate
+自定义命令
+```
+
+选中 `build:test` 后，写入配置的命令为：
+
+```text
+pnpm run build:test
+```
+
+带默认值的输入项，例如：
+
+```text
+项目名称 (nuxt-app)
+构建输出目录 (.output)
+```
+
+括号里的内容是默认值，不是已经输入的文本。直接回车会使用默认值；如果输入后又删除为空，再回车也会使用默认值。
 
 生成的配置示例：
 

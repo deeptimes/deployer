@@ -1,9 +1,10 @@
-import type { CLIOptions, NuxterConfigFile } from '../types/nuxter'
+import type { CLIOptions, NuxterConfigFile, PackageInfo } from '../types/nuxter'
 
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
+import { createPrompt, isBackspaceKey, isEnterKey, isTabKey, makeTheme, useKeypress, usePrefix, useState } from '@inquirer/core'
 import { confirm, input, select } from '@inquirer/prompts'
 import chalk from 'chalk'
 import { getProjectConfigPath, listProfiles, loadEffectiveProfile } from '../config/nuxter'
@@ -126,7 +127,7 @@ async function initProject(projectRoot: string): Promise<void> {
 
   const pkg = readPackageInfo(projectRoot)
   const packageManager = detectPackageManager(projectRoot)
-  const projectName = await input({ message: '项目名称', default: pkg.name || 'nuxter-app' })
+  const projectName = await inputWithDefault('项目名称', pkg.name || 'nuxter-app')
   const mode = await select<'ssr' | 'static' | 'custom'>({
     message: '默认构建模式',
     choices: [
@@ -135,14 +136,11 @@ async function initProject(projectRoot: string): Promise<void> {
       { name: 'Custom', value: 'custom' },
     ],
   })
-  const command = await input({
-    message: '构建命令',
-    default: detectBuildCommand(pkg, packageManager, mode),
-  })
-  const output = await input({ message: '构建输出目录', default: mode === 'static' ? 'dist' : '.output' })
+  const command = await selectBuildCommand(pkg, packageManager, mode)
+  const output = await inputWithDefault('构建输出目录', mode === 'static' ? 'dist' : '.output')
   const host = await input({ message: 'SSH host' })
-  const username = await input({ message: 'SSH username', default: 'root' })
-  const privateKey = await input({ message: 'SSH private key path', default: '~/.ssh/id_rsa' })
+  const username = await inputWithDefault('SSH username', 'root')
+  const privateKey = await inputWithDefault('SSH private key path', '~/.ssh/id_rsa')
   const remoteRoot = await input({ message: '远程根目录，例如 /www/web/example.com' })
   const pm2Name = mode === 'ssr' ? await input({ message: 'PM2 应用名' }) : ''
 
@@ -201,6 +199,103 @@ async function initProject(projectRoot: string): Promise<void> {
   await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8')
   console.log(`已生成 ${configPath}`)
   console.log('下一步: nuxter doctor prod')
+}
+
+async function selectBuildCommand(pkg: PackageInfo, packageManager: string, mode: 'ssr' | 'static' | 'custom'): Promise<string> {
+  const scripts = pkg.scripts || {}
+  const scriptNames = Object.keys(scripts)
+  const defaultCommand = detectBuildCommand(pkg, packageManager, mode)
+
+  if (!scriptNames.length) {
+    return inputWithDefault('构建命令', defaultCommand)
+  }
+
+  const run = packageManager === 'npm' ? 'npm run' : `${packageManager} run`
+  const prioritized = sortBuildScripts(scriptNames)
+  const selected = await select<string>({
+    message: '选择构建命令',
+    choices: [
+      ...prioritized.map(name => ({
+        name: `${name}  ->  ${scripts[name]}`,
+        value: `${run} ${name}`,
+      })),
+      { name: '自定义命令', value: '__custom__' },
+    ],
+    default: defaultCommand || `${run} ${prioritized[0]}`,
+  })
+
+  if (selected !== '__custom__')
+    return selected
+
+  return inputWithDefault('构建命令', defaultCommand)
+}
+
+const inputPreserveDefault = createPrompt<string, { message: string, default: string }>((config, done) => {
+  const theme = makeTheme({}, undefined)
+  const [status, setStatus] = useState<'idle' | 'done'>('idle')
+  const [value, setValue] = useState('')
+  const defaultValue = String(config.default || '')
+  const prefix = usePrefix({ status, theme })
+
+  useKeypress((key, rl) => {
+    if (status !== 'idle')
+      return
+
+    if (isEnterKey(key)) {
+      const answer = value || defaultValue
+      setValue(answer)
+      setStatus('done')
+      done(answer)
+      return
+    }
+
+    if (isBackspaceKey(key) && !value) {
+      return
+    }
+
+    if (isTabKey(key) && !value) {
+      rl.clearLine(0)
+      rl.write(defaultValue)
+      setValue(defaultValue)
+      return
+    }
+
+    setValue(rl.line)
+  })
+
+  const message = theme.style.message(config.message, status)
+  const defaultStr = status !== 'done' && !value && defaultValue
+    ? theme.style.defaultAnswer(defaultValue)
+    : undefined
+  const answer = status === 'done' ? theme.style.answer(value) : value
+
+  return [prefix, message, defaultStr, answer].filter(item => item !== undefined).join(' ')
+})
+
+function inputWithDefault(message: string, defaultValue: string): Promise<string> {
+  return inputPreserveDefault({
+    message,
+    default: defaultValue,
+  }).then(value => value.trim() || defaultValue)
+}
+
+function sortBuildScripts(scriptNames: string[]): string[] {
+  const score = (name: string) => {
+    if (name === 'build')
+      return 0
+    if (name.startsWith('build:'))
+      return 1
+    if (name === 'generate' || name === 'ssg')
+      return 2
+    if (name.includes('build') || name.includes('generate'))
+      return 3
+    return 4
+  }
+
+  return [...scriptNames].sort((left, right) => {
+    const diff = score(left) - score(right)
+    return diff || left.localeCompare(right)
+  })
 }
 
 async function withRemote<T>(profile, handler: (remote: RemoteClient) => Promise<T>): Promise<T> {
