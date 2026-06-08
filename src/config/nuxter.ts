@@ -1,4 +1,4 @@
-import type { EffectiveProfile, GlobalNuxterConfigFile, NuxterConfigFile, ProfileConfig } from '../types/nuxter'
+import type { BuildMode, EffectiveProfile, GlobalNuxterConfigFile, NuxterConfigFile, ProfileConfig } from '../types/nuxter'
 
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -9,6 +9,35 @@ const CONFIG_VERSION = 1
 
 export const PROJECT_CONFIG_PATH = '.nuxter/config.json'
 export const GLOBAL_CONFIG_PATH = '.nuxter/config.json'
+
+const BASE_PROFILE_DEFAULTS: ProfileConfig = {
+  ssh: {
+    port: 22,
+    username: 'root',
+    readyTimeout: 20000,
+  },
+  remote: {
+    distDir: 'dist',
+    bakDir: 'bak',
+  },
+  build: {
+    mode: 'ssr',
+    archive: 'dist.tar.gz',
+    excludes: ['.DS_Store', '._*', '__MACOSX'],
+  },
+  process: {
+    action: 'reload',
+  },
+  webServer: {
+    type: 'nginx',
+    reloadCommand: 'nginx -s reload',
+    owner: 'auto',
+    group: 'auto',
+  },
+  retain: {
+    backups: 5,
+  },
+}
 
 export function getProjectConfigPath(projectRoot: string): string {
   return resolve(projectRoot, PROJECT_CONFIG_PATH)
@@ -54,7 +83,7 @@ export function loadEffectiveProfile(projectRoot: string, profileName: string): 
   if (!rawProfile)
     throw new Error(`profile 不存在: ${profileName}`)
 
-  const merged = mergeProfile(globalConfig.defaults, projectConfig.defaults, rawProfile)
+  const merged = mergeProfile({ ...BASE_PROFILE_DEFAULTS, ssh: {} }, globalConfig.defaults, projectConfig.defaults, rawProfile)
   const identity = merged.ssh?.identity
   const identitySSH = identity ? globalConfig.identities?.[identity] : undefined
   const ssh = { ...identitySSH, ...merged.ssh }
@@ -70,41 +99,37 @@ export function loadEffectiveProfile(projectRoot: string, profileName: string): 
     envInit: merged.envInit || [],
     ssh: {
       host: requireString(ssh?.host, 'ssh.host'),
-      port: ssh?.port || 22,
-      username: requireString(ssh?.username, 'ssh.username'),
+      port: ssh?.port || BASE_PROFILE_DEFAULTS.ssh!.port!,
+      username: ssh?.username || BASE_PROFILE_DEFAULTS.ssh!.username!,
       privateKey: requireString(ssh?.privateKey, 'ssh.privateKey'),
-      readyTimeout: ssh?.readyTimeout || 20000,
+      readyTimeout: ssh?.readyTimeout || BASE_PROFILE_DEFAULTS.ssh!.readyTimeout!,
       passphrase: ssh?.passphrase,
     },
     remote: {
       root: requireString(merged.remote?.root, 'remote.root'),
-      distDir: merged.remote?.distDir || 'dist',
-      bakDir: merged.remote?.bakDir || 'bak',
-      nuxterDir: merged.remote?.nuxterDir || '.nuxter',
-      uploadsDir: merged.remote?.uploadsDir || 'uploads',
-      stagingDir: merged.remote?.stagingDir || 'staging',
-      logsDir: merged.remote?.logsDir || 'logs',
+      distDir: merged.remote?.distDir || BASE_PROFILE_DEFAULTS.remote!.distDir!,
+      bakDir: merged.remote?.bakDir || BASE_PROFILE_DEFAULTS.remote!.bakDir!,
     },
     build: {
-      mode: merged.build?.mode || 'ssr',
+      mode: merged.build?.mode || BASE_PROFILE_DEFAULTS.build!.mode!,
       command: requireString(merged.build?.command, 'build.command'),
-      output: merged.build?.output || '.output',
-      archive: merged.build?.archive || 'dist.tar.gz',
-      excludes: merged.build?.excludes || ['.DS_Store', '._*', '__MACOSX'],
+      output: merged.build?.output || defaultBuildOutput(merged.build?.mode),
+      archive: merged.build?.archive || BASE_PROFILE_DEFAULTS.build!.archive!,
+      excludes: merged.build?.excludes || BASE_PROFILE_DEFAULTS.build!.excludes!,
     },
     process: {
-      type: merged.process?.type || (merged.build?.mode === 'static' ? 'none' : 'pm2'),
+      type: merged.process?.type || (merged.build?.mode === 'ssr' ? 'pm2' : 'none'),
       name: merged.process?.name,
-      action: merged.process?.action || 'reload',
+      action: merged.process?.action || BASE_PROFILE_DEFAULTS.process!.action!,
     },
     webServer: {
-      type: merged.webServer?.type || 'nginx',
-      reloadCommand: merged.webServer?.reloadCommand || 'nginx -s reload',
-      owner: merged.webServer?.owner || 'auto',
-      group: merged.webServer?.group || 'auto',
+      type: merged.webServer?.type || BASE_PROFILE_DEFAULTS.webServer!.type!,
+      reloadCommand: merged.webServer?.reloadCommand || BASE_PROFILE_DEFAULTS.webServer!.reloadCommand!,
+      owner: merged.webServer?.owner || BASE_PROFILE_DEFAULTS.webServer!.owner!,
+      group: merged.webServer?.group || BASE_PROFILE_DEFAULTS.webServer!.group!,
     },
     retain: {
-      backups: merged.retain?.backups || 5,
+      backups: merged.retain?.backups || BASE_PROFILE_DEFAULTS.retain!.backups!,
     },
   }
 
@@ -132,6 +157,10 @@ function mergeProfile(...profiles: Array<Partial<ProfileConfig> | undefined>): P
 function validateEffectiveProfile(profile: EffectiveProfile) {
   if (profile.build.mode === 'ssr' && profile.process.type === 'pm2' && !profile.process.name)
     throw new Error(`profile ${profile.name} 是 SSR + PM2 模式，但缺少 process.name`)
+}
+
+function defaultBuildOutput(mode?: BuildMode): string {
+  return mode === 'static' ? '.output/public' : '.output'
 }
 
 function requireString(value: unknown, key: string): string {

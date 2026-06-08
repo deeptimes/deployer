@@ -42,10 +42,6 @@ export interface ProfileConfig {
     root?: string
     distDir?: string
     bakDir?: string
-    nuxterDir?: string
-    uploadsDir?: string
-    stagingDir?: string
-    logsDir?: string
   }
   build?: {
     mode?: BuildMode
@@ -83,10 +79,6 @@ export interface EffectiveProfile {
     root: string
     distDir: string
     bakDir: string
-    nuxterDir: string
-    uploadsDir: string
-    stagingDir: string
-    logsDir: string
   }
   build: {
     mode: BuildMode

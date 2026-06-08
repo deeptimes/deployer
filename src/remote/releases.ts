@@ -5,28 +5,32 @@ import { joinRemotePath, quoteShell } from '../utils/shell'
 
 export function paths(profile: EffectiveProfile) {
   const root = profile.remote.root
-  const nuxter = joinRemotePath(root, profile.remote.nuxterDir)
+  const tmpPrefix = `/tmp/nuxter-${safePathPart(profile.projectName)}-${safePathPart(profile.name)}`
   return {
     root,
     dist: joinRemotePath(root, profile.remote.distDir),
     bak: joinRemotePath(root, profile.remote.bakDir),
-    logs: joinRemotePath(root, profile.remote.logsDir),
-    nuxter,
-    uploads: joinRemotePath(nuxter, profile.remote.uploadsDir),
-    staging: joinRemotePath(nuxter, profile.remote.stagingDir),
+    remoteArchive: `${tmpPrefix}.tar.gz`,
+    staging: `${tmpPrefix}-staging`,
+    previous: `${tmpPrefix}-previous`,
   }
 }
 
 export async function ensureRemoteLayout(remote: RemoteClient, profile: EffectiveProfile): Promise<void> {
   const p = paths(profile)
-  await remote.mustExec(`mkdir -p ${quoteShell(p.bak)} ${quoteShell(p.uploads)} ${quoteShell(p.staging)} ${quoteShell(p.logs)}`, '创建远程目录')
+  await remote.mustExec(`mkdir -p ${quoteShell(p.bak)}`, '创建远程目录')
+}
+
+export async function cleanupRemoteTemp(remote: RemoteClient, profile: EffectiveProfile): Promise<void> {
+  const p = paths(profile)
+  await remote.mustExec(`rm -rf ${quoteShell(p.remoteArchive)} ${quoteShell(p.staging)}`, '清理远程临时文件')
 }
 
 export async function listRemoteBackups(remote: RemoteClient, profile: EffectiveProfile): Promise<BackupInfo[]> {
   const p = paths(profile)
   const result = await remote.mustExec(
     `cd ${quoteShell(p.bak)} && ls -1t *.tar.gz 2>/dev/null || true`,
-    '读取备份版本列表',
+    '读取备份列表',
   )
 
   return result.stdout
@@ -36,17 +40,17 @@ export async function listRemoteBackups(remote: RemoteClient, profile: Effective
     .map(file => ({ file, id: file.replace(/\.tar\.gz$/, '') }))
 }
 
-export async function stageArchive(remote: RemoteClient, profile: EffectiveProfile, archivePath: string, stageId: string): Promise<string> {
+export async function stageArchive(remote: RemoteClient, profile: EffectiveProfile, archivePath: string): Promise<string> {
   const p = paths(profile)
-  const stagePath = joinRemotePath(p.staging, stageId)
+  const stagePath = p.staging
   await remote.mustExec(`rm -rf ${quoteShell(stagePath)} && mkdir -p ${quoteShell(stagePath)}`, '准备 staging 目录')
   await remote.mustExec(`tar -xzf ${quoteShell(archivePath)} -C ${quoteShell(stagePath)} --warning=no-unknown-keyword`, '解压到 staging')
   return stagePath
 }
 
-export async function replaceDist(remote: RemoteClient, profile: EffectiveProfile, stagePath: string, operationId: string): Promise<void> {
+export async function replaceDist(remote: RemoteClient, profile: EffectiveProfile, stagePath: string): Promise<void> {
   const p = paths(profile)
-  const previousPath = joinRemotePath(p.staging, `previous-${operationId}`)
+  const previousPath = p.previous
   await remote.mustExec(
     [
       `rm -rf ${quoteShell(previousPath)}`,
@@ -75,4 +79,8 @@ export async function cleanupBackups(remote: RemoteClient, profile: EffectivePro
     `cd ${quoteShell(p.bak)} && ls -1t *.tar.gz 2>/dev/null | tail -n +${retain + 1} | xargs -r rm -f`,
     '清理历史备份',
   )
+}
+
+function safePathPart(value: string): string {
+  return value.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'default'
 }

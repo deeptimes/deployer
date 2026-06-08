@@ -10,11 +10,11 @@ export async function runDoctor(remote: RemoteClient, profile: EffectiveProfile,
 
   await remote.mustExec('command -v tar', '检查 tar')
   await remote.mustExec(`mkdir -p ${quoteShell(p.root)} && test -w ${quoteShell(p.root)}`, '检查远程根目录')
-  await remote.mustExec(`mkdir -p ${quoteShell(p.bak)} ${quoteShell(p.staging)} ${quoteShell(p.uploads)} && test -w ${quoteShell(p.bak)} && test -w ${quoteShell(p.staging)} && test -w ${quoteShell(p.uploads)}`, '检查远程工作目录')
+  await remote.mustExec(`mkdir -p ${quoteShell(p.bak)} && test -w ${quoteShell(p.bak)}`, '检查远程备份目录')
 
   if (profile.process.type === 'pm2') {
     await remote.mustExec('command -v pm2', '检查 PM2')
-    await remote.mustExec(`pm2 jlist | grep -F ${quoteShell(`"name":"${profile.process.name}"`)}`, `检查 PM2 应用 ${profile.process.name}`)
+    await checkPm2Process(remote, profile)
   }
 
   if (profile.webServer.type === 'nginx') {
@@ -24,6 +24,18 @@ export async function runDoctor(remote: RemoteClient, profile: EffectiveProfile,
   }
 
   console.log('预检通过')
+}
+
+async function checkPm2Process(remote: RemoteClient, profile: EffectiveProfile): Promise<void> {
+  const result = await remote.mustExec('pm2 jlist', '读取 PM2 应用列表')
+  const list = JSON.parse(result.stdout) as Array<{ name?: string }>
+  const matches = list.filter(item => item.name === profile.process.name)
+
+  if (matches.length > 1)
+    throw new Error(`PM2 应用名不唯一: ${profile.process.name}，请先清理重复进程`)
+
+  if (!matches.length)
+    console.log(`PM2 应用 ${profile.process.name} 不存在，部署时将自动创建`)
 }
 
 export async function resolveNginxOwner(remote: RemoteClient, profile: EffectiveProfile): Promise<{ owner: string, group: string }> {

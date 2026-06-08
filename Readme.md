@@ -6,10 +6,10 @@ Nuxter 是一个面向 Nuxt 项目的本地全局部署工具，用于在本机�
 
 - 命令入口：`nuxter`
 - 配置文件：项目根目录 `.nuxter/config.json`
-- 部署环境：通过 profile 区分，例如 `test`、`staging`、`prod`
+- 部署环境：通过 profile 区分，初始化默认生成 `default`
 - 服务器线上目录：`dist`，保持为实体目录
-- 历史版本：保存在 `bak/*.tar.gz`
-- 部署中转：使用 `.nuxter/uploads` 和 `.nuxter/staging`
+- 回滚备份：保存在 `bak/*.tar.gz`
+- 部署中转：使用服务器 `/tmp` 下的固定临时文件，部署完成后自动清理
 
 旧命令 `nuxt-deployer` 仍作为兼容别名保留。
 
@@ -46,20 +46,15 @@ Nuxter 预期服务器目录结构为：
 ```text
 /www/web/www.test.com/
   dist/                 # 当前线上实体目录
-  bak/                  # 历史版本压缩包
-  logs/                 # PM2 日志目录，保留你的现有约定
-  .nuxter/
-    uploads/            # 临时上传包
-    staging/            # 部署和回滚的解压中转目录
-    deploy.json         # 最近一次部署元数据
+  bak/                  # 回滚用的历史 dist 压缩包
 ```
 
 说明：
 
 - `dist` 不会被改成软链接。
-- `bak` 中保存的是 `.tar.gz`，不是展开后的目录。
-- `.nuxter/uploads` 只在部署过程中临时存放上传包。
-- `.nuxter/staging` 用于先解压、检查、设置权限，再替换 `dist`。
+- `bak` 中保存的是替换前的旧 `dist` 压缩包，不保存本次新上传包。
+- 上传包和 staging 目录位于服务器 `/tmp`，使用固定名称，每次部署前后都会清理。
+- 项目服务器目录内不会创建 `.nuxter/uploads`、`.nuxter/staging` 或 `deploy.json`。
 
 ## 初始化配置
 
@@ -125,7 +120,7 @@ pnpm run build:test
 
 ```text
 项目名称 (nuxt-app)
-构建输出目录 (.output)
+SSH private key path (~/.ssh/id_rsa)
 ```
 
 括号里的内容是默认值，不是已经输入的文本。直接回车会使用默认值；如果输入后又删除为空，再回车也会使用默认值。
@@ -140,48 +135,55 @@ pnpm run build:test
     "packageManager": "pnpm"
   },
   "profiles": {
-    "prod": {
+    "default": {
       "ssh": {
         "host": "example.com",
-        "port": 22,
-        "username": "root",
-        "privateKey": "~/.ssh/id_rsa",
-        "readyTimeout": 20000
+        "privateKey": "~/.ssh/id_rsa"
       },
       "remote": {
-        "root": "/www/web/www.test.com",
-        "distDir": "dist",
-        "bakDir": "bak",
-        "logsDir": "logs",
-        "nuxterDir": ".nuxter",
-        "uploadsDir": "uploads",
-        "stagingDir": "staging"
+        "root": "/www/web/www.test.com"
       },
       "build": {
         "mode": "ssr",
-        "command": "pnpm run build",
-        "output": ".output",
-        "archive": "dist.tar.gz",
-        "excludes": [".DS_Store", "._*", "__MACOSX"]
+        "command": "pnpm run build"
       },
       "process": {
-        "type": "pm2",
-        "name": "web-www-test",
-        "action": "reload"
-      },
-      "webServer": {
-        "type": "nginx",
-        "reloadCommand": "nginx -s reload",
-        "owner": "auto",
-        "group": "auto"
-      },
-      "retain": {
-        "backups": 5
+        "name": "web-www-test"
       }
     }
   }
 }
 ```
+
+未写入配置的基础默认值由工具内部提供：
+
+- `ssh.username`: `root`
+- `ssh.port`: `22`
+- `ssh.readyTimeout`: `20000`
+- `remote.distDir`: `dist`
+- `remote.bakDir`: `bak`
+- `build.archive`: `dist.tar.gz`
+- `build.output`: SSR/Custom 为 `.output`，Static 为 `.output/public`
+- `build.excludes`: `.DS_Store`、`._*`、`__MACOSX`
+- `process.type`: SSR 为 `pm2`，Static/Custom 为 `none`
+- `process.action`: `reload`
+- `webServer.type`: `nginx`
+- `webServer.reloadCommand`: `nginx -s reload`
+- `webServer.owner/group`: `auto`
+- `retain.backups`: `5`
+
+## 部署用户模型
+
+nuxter v2 当前围绕 root SSH 部署设计。`ssh.username` 默认就是 `root`，初始化配置不会再写入该字段。
+
+```json
+"ssh": {
+  "host": "example.com",
+  "privateKey": "~/.ssh/id_rsa"
+}
+```
+
+原因是部署流程会管理远程目录、设置 owner/group、reload Nginx，并维护 root 用户下的 PM2 应用。普通用户部署需要额外 sudoers、目录 owner 和 PM2 用户隔离配置，当前不作为默认工作流。
 
 ## 查看 profiles
 
@@ -192,9 +194,7 @@ nuxter profiles
 预期结果：
 
 ```text
-test
-staging
-prod
+default
 ```
 
 如果没有 `.nuxter/config.json`，会提示先运行 `nuxter init`。
@@ -202,19 +202,19 @@ prod
 ## 预检服务器
 
 ```bash
-nuxter doctor prod
+nuxter doctor default
 ```
 
 预期过程：
 
 ```text
-1. 读取 prod profile
+1. 读取 default profile
 2. 校验 SSH、remote、build、process、webServer 配置
 3. 连接服务器
 4. 检查 tar 命令
 5. 检查 remote.root 是否可写
-6. 创建并检查 bak、.nuxter/uploads、.nuxter/staging、logs
-7. SSR + PM2 模式下检查 PM2 和应用名
+6. 创建并检查 bak 是否可写
+7. SSR + PM2 模式下检查 PM2；如果应用名不存在，部署时会自动创建
 8. Nginx 模式下检查 nginx 命令
 9. owner/group 为 auto 时尝试识别 Nginx 用户和组
 ```
@@ -222,29 +222,30 @@ nuxter doctor prod
 成功时预期输出：
 
 ```text
-预检: prod -> example.com
+预检: default -> example.com
 预检通过
 ```
 
-失败时会输出失败阶段，例如 SSH 连接失败、远程目录不可写、PM2 应用不存在、Nginx owner/group 无法识别。
+失败时会输出失败阶段，例如 SSH 连接失败、远程目录不可写、PM2 应用名重复、Nginx owner/group 无法识别。
 
 ## 模拟部署
 
 ```bash
-nuxter deploy prod --dry-run
+nuxter deploy default --dry-run
 ```
 
 预期结果：
 
 ```text
-发布版本: 20260608-153000-a1b2c3
-profile: prod
+部署包: default-260608-153000
+profile: default
 host: example.com
 remote root: /www/web/www.test.com
 dist: /www/web/www.test.com/dist
-staging: /www/web/www.test.com/.nuxter/staging/20260608-153000-a1b2c3
-upload: /www/web/www.test.com/.nuxter/uploads/20260608-153000-a1b2c3.tar.gz
-backup: /www/web/www.test.com/bak/20260608-153000-a1b2c3.tar.gz
+local archive: .nuxter/tmp/dist.tar.gz
+remote archive: /tmp/nuxter-www-test-default.tar.gz
+staging: /tmp/nuxter-www-test-default-staging
+backup: /www/web/www.test.com/bak/default-260608-153000.tar.gz
 build: pnpm run build
 output: .output
 process: pm2:web-www-test
@@ -262,7 +263,7 @@ web: nginx
 ## 正式部署
 
 ```bash
-nuxter deploy prod
+nuxter deploy default
 ```
 
 默认会展示部署计划并要求确认。
@@ -270,35 +271,35 @@ nuxter deploy prod
 跳过确认：
 
 ```bash
-nuxter deploy prod --yes
+nuxter deploy default --yes
 ```
 
 不重新 build，直接使用已有输出目录：
 
 ```bash
-nuxter deploy prod --no-build
+nuxter deploy default --no-build
 ```
 
 正式部署预期过程：
 
 ```text
-1. 读取 prod profile
-2. 生成 releaseId
+1. 读取 default profile
+2. 生成部署标识，格式为 `profile-YYMMDD-HHmmss`
 3. 展示部署计划并确认
 4. SSH 连接服务器
 5. 执行轻量预检
 6. 本地执行 build.command
 7. 校验 build.output 存在且非空
-8. 本地打包 build.output 到 .nuxter/tmp/<releaseId>.tar.gz
-9. 上传到服务器 .nuxter/uploads/<releaseId>.tar.gz
-10. 解压到服务器 .nuxter/staging/<releaseId>/
-11. 对 staging 设置 owner/group 和权限
-12. 将当前 dist 打包为 bak/pre-<releaseId>.tar.gz
-13. 用 staging/<releaseId> 替换 dist
-14. 执行 PM2 reload/restart
-15. 执行 Nginx reload
-16. 将上传包移动为 bak/<releaseId>.tar.gz
-17. 写入 .nuxter/deploy.json
+8. 清空本地 .nuxter/tmp，并重新打包 build.output 到 .nuxter/tmp/dist.tar.gz
+9. 清理服务器 /tmp 下的固定临时上传包和 staging 目录
+10. 上传到服务器 /tmp/nuxter-<project>-<profile>.tar.gz
+11. 解压到服务器 /tmp/nuxter-<project>-<profile>-staging/
+12. 对 staging 设置 owner/group 和权限
+13. 将当前 dist 打包为 bak/<deployId>.tar.gz
+14. 用 staging 替换 dist
+15. SSR + PM2 模式下执行 PM2 reload/restart；如果 PM2 应用不存在，则自动 start
+16. 执行 Nginx reload
+17. 清理服务器 /tmp 下的固定临时上传包和 staging 目录
 18. 清理超出保留数量的 bak/*.tar.gz
 ```
 
@@ -309,10 +310,10 @@ nuxter deploy prod --no-build
 - 替换 `dist` 前会先备份当前 `dist`。
 - `dist` 始终是实体目录，不是软链接。
 
-## 查看可回滚版本
+## 查看可回滚备份
 
 ```bash
-nuxter releases prod
+nuxter backups default
 ```
 
 实际读取：
@@ -324,28 +325,27 @@ nuxter releases prod
 预期输出：
 
 ```text
-20260608-153000-a1b2c3
-pre-20260608-153000-a1b2c3
-20260607-221000-c9d8e7
+default-260608-153000
+default-260607-221000
 ```
 
 说明：
 
 - 输出值不包含 `.tar.gz` 后缀。
-- `pre-*` 是部署或回滚前自动备份的旧 `dist`。
+- 每个文件都是一次替换前的旧 `dist`，用于回滚。
 
 ## 回滚
 
-交互式选择版本：
+交互式选择备份：
 
 ```bash
-nuxter rollback prod
+nuxter rollback default
 ```
 
-指定版本：
+指定备份：
 
 ```bash
-nuxter rollback prod --target 20260607-221000-c9d8e7
+nuxter rollback default --target default-260607-221000
 ```
 
 预期过程：
@@ -353,11 +353,11 @@ nuxter rollback prod --target 20260607-221000-c9d8e7
 ```text
 1. SSH 连接服务器
 2. 读取 bak/*.tar.gz
-3. 选择或使用 --target 指定版本
-4. 解压目标包到 .nuxter/staging/rollback-<target>/
-5. 将当前 dist 打包为 bak/pre-rollback-<target>.tar.gz
+3. 选择或使用 --target 指定备份
+4. 解压目标包到服务器 /tmp 下的固定 staging 目录
+5. 将当前 dist 打包为 bak/rollback-<target>.tar.gz
 6. 用 staging 目录替换 dist
-7. 执行 PM2 reload/restart
+7. SSR + PM2 模式下执行 PM2 reload/restart
 8. 执行 Nginx reload
 9. 输出回滚完成
 ```
@@ -376,18 +376,21 @@ nuxter rollback prod --target 20260607-221000-c9d8e7
 {
   "build": {
     "mode": "ssr",
-    "command": "pnpm run build",
-    "output": ".output"
+    "command": "pnpm run build"
   },
   "process": {
-    "type": "pm2",
-    "name": "web-www-test",
-    "action": "reload"
+    "name": "web-www-test"
   }
 }
 ```
 
-部署后会执行 PM2 和 Nginx reload。
+部署后会执行 PM2 和 Nginx reload。首次部署时，如果 `process.name` 对应的 PM2 应用不存在，会自动执行：
+
+```bash
+pm2 start /www/web/www.test.com/dist/server/index.mjs --name web-www-test
+```
+
+后续部署会使用 `process.action` 对同名应用执行 `pm2 reload` 或 `pm2 restart`。`process.name` 必须唯一；如果远程存在多个同名 PM2 应用，部署会中止。
 
 ### Static
 
@@ -399,16 +402,12 @@ nuxter rollback prod --target 20260607-221000-c9d8e7
 {
   "build": {
     "mode": "static",
-    "command": "pnpm run generate",
-    "output": ".output/public"
-  },
-  "process": {
-    "type": "none"
+    "command": "pnpm run generate"
   }
 }
 ```
 
-部署后默认只执行 Nginx reload。
+Static 模式默认 `process.type` 为 `none`，部署后不会检查或重启 PM2，只执行 Nginx reload。
 
 ### Custom
 

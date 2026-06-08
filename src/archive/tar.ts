@@ -1,15 +1,16 @@
 import type { EffectiveProfile } from '../types/nuxter'
 
-import { mkdir, stat } from 'node:fs/promises'
+import { mkdir, rm, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { execa } from 'execa'
 
-export async function createArchive(profile: EffectiveProfile, releaseId: string): Promise<{ file: string, size: number }> {
+export async function createArchive(profile: EffectiveProfile): Promise<{ file: string, size: number }> {
   const tmpDir = resolve(profile.projectRoot, '.nuxter/tmp')
+  await rm(tmpDir, { recursive: true, force: true })
   await mkdir(tmpDir, { recursive: true })
 
-  const archiveFile = resolve(tmpDir, `${releaseId}.tar.gz`)
+  const archiveFile = resolve(tmpDir, profile.build.archive)
   const args = [
     '-czf',
     archiveFile,

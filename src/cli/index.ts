@@ -32,7 +32,7 @@ export async function runCLI(argv = process.argv.slice(2), projectRoot = process
     const profiles = safeListProfiles(projectRoot)
     if (profiles.length)
       console.log(`可用 profile: ${profiles.join(', ')}`)
-    throw new Error(`请指定 profile，例如: nuxter ${command} prod`)
+    throw new Error(`请指定 profile，例如: nuxter ${command} default`)
   }
 
   const effective = loadEffectiveProfile(projectRoot, profile)
@@ -53,11 +53,11 @@ export async function runCLI(argv = process.argv.slice(2), projectRoot = process
     return
   }
 
-  if (command === 'releases') {
+  if (command === 'backups' || command === 'releases') {
     await withRemote(effective, async (remote) => {
       const backups = await listRemoteBackups(remote, effective)
       if (!backups.length) {
-        console.log('暂无备份版本')
+        console.log('暂无备份')
         return
       }
       for (const backup of backups)
@@ -70,10 +70,10 @@ export async function runCLI(argv = process.argv.slice(2), projectRoot = process
     await withRemote(effective, async (remote) => {
       const backups = await listRemoteBackups(remote, effective)
       if (!backups.length)
-        throw new Error('没有可回滚的备份版本')
+        throw new Error('没有可回滚的备份')
 
       const selectedTarget = options.target || await select({
-        message: '选择回滚版本',
+        message: '选择回滚备份',
         choices: backups.map(backup => ({ name: backup.id, value: backup.id })),
       })
       const target = selectedTarget.replace(/\.tar\.gz$/, '')
@@ -81,9 +81,9 @@ export async function runCLI(argv = process.argv.slice(2), projectRoot = process
       const p = paths(effective)
       const backupFile = joinRemotePath(p.bak, `${target}.tar.gz`)
       const rollbackId = `rollback-${target}`
-      const stagePath = await stageArchive(remote, effective, backupFile, rollbackId)
-      await backupCurrentDist(remote, effective, `pre-${rollbackId}`)
-      await replaceDist(remote, effective, stagePath, rollbackId)
+      const stagePath = await stageArchive(remote, effective, backupFile)
+      await backupCurrentDist(remote, effective, rollbackId)
+      await replaceDist(remote, effective, stagePath)
       await reloadServices(remote, effective)
       console.log(`已回滚到 ${target}`)
     })
@@ -137,9 +137,7 @@ async function initProject(projectRoot: string): Promise<void> {
     ],
   })
   const command = await selectBuildCommand(pkg, packageManager, mode)
-  const output = await inputWithDefault('构建输出目录', mode === 'static' ? 'dist' : '.output')
   const host = await input({ message: 'SSH host' })
-  const username = await inputWithDefault('SSH username', 'root')
   const privateKey = await inputWithDefault('SSH private key path', '~/.ssh/id_rsa')
   const remoteRoot = await input({ message: '远程根目录，例如 /www/web/example.com' })
   const pm2Name = mode === 'ssr' ? await input({ message: 'PM2 应用名' }) : ''
@@ -147,39 +145,18 @@ async function initProject(projectRoot: string): Promise<void> {
   const profile = {
     ssh: {
       host,
-      port: 22,
-      username,
       privateKey,
-      readyTimeout: 20000,
     },
     remote: {
       root: remoteRoot,
-      distDir: 'dist',
-      bakDir: 'bak',
-      nuxterDir: '.nuxter',
-      uploadsDir: 'uploads',
-      stagingDir: 'staging',
-      logsDir: 'logs',
     },
     build: {
       mode,
       command,
-      output,
-      archive: 'dist.tar.gz',
-      excludes: ['.DS_Store', '._*', '__MACOSX'],
     },
     process: mode === 'ssr'
-      ? { type: 'pm2', name: pm2Name, action: 'reload' }
-      : { type: 'none' },
-    webServer: {
-      type: 'nginx',
-      reloadCommand: 'nginx -s reload',
-      owner: 'auto',
-      group: 'auto',
-    },
-    retain: {
-      backups: 5,
-    },
+      ? { name: pm2Name }
+      : undefined,
   } satisfies NuxterConfigFile['profiles'][string]
 
   const config: NuxterConfigFile = {
@@ -189,16 +166,14 @@ async function initProject(projectRoot: string): Promise<void> {
       packageManager,
     },
     profiles: {
-      test: profile,
-      staging: profile,
-      prod: profile,
+      default: profile,
     },
   }
 
   await mkdir(dirname(configPath), { recursive: true })
   await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8')
   console.log(`已生成 ${configPath}`)
-  console.log('下一步: nuxter doctor prod')
+  console.log('下一步: nuxter doctor default')
 }
 
 async function selectBuildCommand(pkg: PackageInfo, packageManager: string, mode: 'ssr' | 'static' | 'custom'): Promise<string> {
@@ -338,8 +313,8 @@ Usage:
   nuxter init
   nuxter doctor <profile>
   nuxter deploy <profile> [--yes] [--no-build] [--dry-run]
-  nuxter releases <profile>
-  nuxter rollback <profile> [--target <releaseId>]
+  nuxter backups <profile>
+  nuxter rollback <profile> [--target <backupId>]
   nuxter profiles
 `)
 }
