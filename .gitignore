@@ -10,3 +10,7 @@ logs
 .nitro
 .cache
 deploy.config.js
+.pnpm-store
+.nuxter/tmp
+.nuxter/logs
+playground

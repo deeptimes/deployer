@@ -6,7 +6,7 @@ export default defineConfig({
   format: ['esm'], // 只输出 ESM 格式
   dts: {
     entry: {
-      index: 'src/types/index.ts', // 显式指定类型入口
+      index: 'src/index.ts', // 显式指定类型入口
     },
     resolve: true,
   },

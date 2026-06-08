@@ -17,9 +17,9 @@ export async function uploadFile(sftp: SFTPWrapper, cfgs: DeployToolConfig, opts
         chunkSize: 32768, // 32KB
         /**
          * @function step
-         * @param transferred: number - 已传输的字节数
-         * @param chunk: number - 当前块的大小（字节）
-         * @param total: number - 文件总大小（字节）
+         * @param transferred 已传输的字节数
+         * @param chunk 当前块的大小（字节）
+         * @param total 文件总大小（字节）
          */
         step(transferred: number, chunk: number, total: number) {
           updateProgressBar(transferred, total)

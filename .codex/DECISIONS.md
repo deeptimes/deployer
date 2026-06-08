@@ -1,5 +1,7 @@
 # Nuxter 重构需求决策记录
 
+> 最新覆盖决策：服务器端不再采用长期展开的 `releases/current` 模型。Nuxter 2.0 以 `/www/web/<site>/dist` 实体目录作为线上入口，以 `/www/web/<site>/bak/*.tar.gz` 作为历史版本备份，以 `/www/web/<site>/.nuxter/uploads` 和 `/www/web/<site>/.nuxter/staging` 作为部署中转目录。下文中与 `release/current` 软链模型冲突的旧描述，以 `.codex/DIST_BACKUP_DECISION.md` 为准。
+
 ## 1. 文档定位
 
 本文档基于 `.codex/PRD.md` 和 `.codex/RRD.md`，对重构需求做架构级决策。它不是新的需求列表，而是把 PRD 中存在取舍空间的部分固化为可执行决策，作为后续技术方案、任务拆分和代码重构的依据。

@@ -28,7 +28,8 @@
     // 其他配置
     "forceConsistentCasingInFileNames": true, // 强制文件名大小写一致
     "isolatedModules": true, // 将每个文件作为单独的模块
-    "skipLibCheck": true // 跳过库文件检查
+    "skipLibCheck": true, // 跳过库文件检查
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "src/**/*" // 包含的文件
