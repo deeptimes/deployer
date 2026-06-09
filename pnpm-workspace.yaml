@@ -1,6 +1,13 @@
 shellEmulator: true
 trustPolicy: no-downgrade
+trustPolicyExclude:
+  - chokidar@4.0.3
 onlyBuiltDependencies:
+  - cpu-features
   - esbuild
   - ssh2
   - unrs-resolver
+allowBuilds:
+  cpu-features: true
+  esbuild: true
+  ssh2: true

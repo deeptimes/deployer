@@ -33,9 +33,9 @@
     "type-check": "tsc --noEmit",
     "deployer": "nuxter",
     "release": "pnpm run build && pnpm publish --access public",
-    "patch": "npm version patch",
-    "minor": "npm version minor",
-    "major": "npm version major"
+    "vpatch": "npm version patch",
+    "vminor": "npm version minor",
+    "vmajor": "npm version major"
   },
   "dependencies": {
     "@deeptimes/deployer": "link:",
