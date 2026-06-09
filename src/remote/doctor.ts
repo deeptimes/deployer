@@ -2,6 +2,7 @@ import type { RemoteClient } from '../ssh/RemoteClient'
 import type { EffectiveProfile } from '../types/nuxter'
 
 import { quoteShell } from '../utils/shell'
+import { listPm2Processes } from './pm2'
 import { paths } from './releases'
 
 export async function runDoctor(remote: RemoteClient, profile: EffectiveProfile, mode: 'full' | 'light' = 'full'): Promise<void> {
@@ -35,9 +36,7 @@ async function checkRemoteCommand(remote: RemoteClient, command: string, label: 
 }
 
 async function checkPm2Process(remote: RemoteClient, profile: EffectiveProfile): Promise<void> {
-  const result = await remote.mustExec('pm2 jlist', '读取 PM2 应用列表')
-  const list = JSON.parse(result.stdout) as Array<{ name?: string }>
-  const matches = list.filter(item => item.name === profile.process.name)
+  const matches = await listPm2Processes(remote, profile.process.name!)
 
   if (matches.length > 1)
     throw new Error(`PM2 应用名不唯一: ${profile.process.name}，请先清理重复进程`)

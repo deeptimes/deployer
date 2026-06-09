@@ -14,6 +14,6 @@ export function joinRemotePath(...parts: string[]): string {
 }
 
 export function commandWithEnv(command: string, envInit: string[]): string {
-  const init = envInit.filter(item => item.trim())
+  const init = envInit.filter(item => item.trim()).map(item => `{ ${item}; } >/dev/null`)
   return init.length ? `${init.join(' && ')} && ${command}` : command
 }

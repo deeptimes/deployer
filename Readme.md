@@ -188,7 +188,7 @@ nuxter v2 当前围绕 root SSH 部署设计。`ssh.username` 默认就是 `root
 
 ## 远程环境初始化
 
-远程命令会先执行 `envInit`，默认会尝试加载 `/etc/profile` 和 `~/.nvm/nvm.sh`，用于兼容通过 nvm 安装的 Node.js/PM2。默认初始化命令带有兜底逻辑，即使服务器没有 nvm 也不会导致预检失败。
+远程命令会先执行 `envInit`，默认会尝试加载 `/etc/profile` 和 `~/.nvm/nvm.sh`，用于兼容通过 nvm 安装的 Node.js/PM2。默认初始化命令带有兜底逻辑，即使服务器没有 nvm 也不会导致预检失败。`envInit` 的标准输出会被静默处理，避免环境脚本输出污染 `pm2 jlist` 等需要解析 stdout 的命令。
 
 如需覆盖，可在 profile 中显式配置：
 

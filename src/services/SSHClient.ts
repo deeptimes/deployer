@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { Client } from 'ssh2'
+import { commandWithEnv } from '../utils/shell'
 
 export class SSHClient {
   private conn: Client
@@ -53,8 +54,7 @@ export class SSHClient {
   /* 执行远程连接命令 */
   public execCommand(command: string): Promise<{ stdout: string, stderr: string, code: number } | CommandError> {
     return new Promise((resolve, reject) => {
-      const commandPrefix = this.envInit.length > 0 ? `${this.envInit.join(' && ')} && ` : ''
-      this.conn.exec(`${commandPrefix}${command}`, (err, stream) => {
+      this.conn.exec(commandWithEnv(command, this.envInit), (err, stream) => {
         if (err) {
           reject(new Error(err.message))
           return

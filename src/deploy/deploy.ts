@@ -3,6 +3,7 @@ import type { CLIOptions, EffectiveProfile } from '../types/nuxter'
 import { createArchive } from '../archive/tar'
 import { assertOutputReady, runBuild } from '../build/runner'
 import { resolveNginxOwner, runDoctor } from '../remote/doctor'
+import { listPm2Processes } from '../remote/pm2'
 import { backupCurrentDist, cleanupBackups, cleanupRemoteTemp, ensureRemoteLayout, paths, replaceDist, stageArchive } from '../remote/releases'
 import { RemoteClient } from '../ssh/RemoteClient'
 import { joinRemotePath, quoteShell } from '../utils/shell'
@@ -80,13 +81,6 @@ async function reloadOrStartPm2(remote: RemoteClient, profile: EffectiveProfile)
 
   await remote.mustExec(`pm2 ${profile.process.action} ${quoteShell(processName)}`, `PM2 ${profile.process.action}`)
 }
-
-async function listPm2Processes(remote: RemoteClient, processName: string): Promise<unknown[]> {
-  const result = await remote.mustExec('pm2 jlist', '读取 PM2 应用列表')
-  const list = JSON.parse(result.stdout) as Array<{ name?: string }>
-  return list.filter(item => item.name === processName)
-}
-
 function printDeployPlan(profile: EffectiveProfile, deployId: string): void {
   const p = paths(profile)
   console.log(`profile: ${profile.name}`)
