@@ -7,3 +7,6 @@ eslint.config.js
 tsup.config.ts
 deploy.config.js
 .gitignore
+playground/
+.codex
+.pnpm-store
