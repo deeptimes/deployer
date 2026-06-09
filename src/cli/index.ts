@@ -14,6 +14,7 @@ import { runDoctor } from '../remote/doctor'
 import { backupCurrentDist, listRemoteBackups, paths, replaceDist, stageArchive } from '../remote/releases'
 import { RemoteClient } from '../ssh/RemoteClient'
 import { joinRemotePath } from '../utils/shell'
+import { VERSION } from '../version'
 
 export async function runCLI(argv = process.argv.slice(2), projectRoot = process.cwd()): Promise<void> {
   const { command, profile, options } = parseArgs(argv)
@@ -100,7 +101,7 @@ function parseArgs(argv: string[]): { command: string, profile?: string, options
     process.exit(0)
   }
   if (command === '--version' || command === '-v') {
-    console.log('2.0.0')
+    console.log(VERSION)
     process.exit(0)
   }
 
@@ -307,7 +308,7 @@ function safeListProfiles(projectRoot: string): string[] {
 }
 
 function printHelp(): void {
-  console.log(`nuxter 2.0
+  console.log(`nuxter ${VERSION}
 
 Usage:
   nuxter init
