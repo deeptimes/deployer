@@ -11,6 +11,10 @@ export const PROJECT_CONFIG_PATH = '.nuxter/config.json'
 export const GLOBAL_CONFIG_PATH = '.nuxter/config.json'
 
 const BASE_PROFILE_DEFAULTS: ProfileConfig = {
+  envInit: [
+    '[ -f /etc/profile ] && . /etc/profile || true',
+    '[ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" || true',
+  ],
   ssh: {
     port: 22,
     username: 'root',

@@ -13,7 +13,7 @@ export async function runDoctor(remote: RemoteClient, profile: EffectiveProfile,
   await remote.mustExec(`mkdir -p ${quoteShell(p.bak)} && test -w ${quoteShell(p.bak)}`, '检查远程备份目录')
 
   if (profile.process.type === 'pm2') {
-    await remote.mustExec('command -v pm2', '检查 PM2')
+    await checkRemoteCommand(remote, 'pm2', '检查 PM2', 'SSH 非交互环境找不到 pm2，请确认 envInit 已加载 /etc/profile 或 nvm')
     await checkPm2Process(remote, profile)
   }
 
@@ -24,6 +24,14 @@ export async function runDoctor(remote: RemoteClient, profile: EffectiveProfile,
   }
 
   console.log('预检通过')
+}
+
+async function checkRemoteCommand(remote: RemoteClient, command: string, label: string, hint: string): Promise<void> {
+  const result = await remote.exec(`command -v ${quoteShell(command)}`)
+  if (result.code !== 0) {
+    const details = result.stderr || result.stdout || `exit code ${result.code}`
+    throw new Error(`${label} 失败: ${details}。${hint}`)
+  }
 }
 
 async function checkPm2Process(remote: RemoteClient, profile: EffectiveProfile): Promise<void> {

@@ -157,6 +157,7 @@ SSH private key path (~/.ssh/id_rsa)
 
 未写入配置的基础默认值由工具内部提供：
 
+- `envInit`: 自动尝试加载 `/etc/profile` 和 `~/.nvm/nvm.sh`
 - `ssh.username`: `root`
 - `ssh.port`: `22`
 - `ssh.readyTimeout`: `20000`
@@ -184,6 +185,19 @@ nuxter v2 当前围绕 root SSH 部署设计。`ssh.username` 默认就是 `root
 ```
 
 原因是部署流程会管理远程目录、设置 owner/group、reload Nginx，并维护 root 用户下的 PM2 应用。普通用户部署需要额外 sudoers、目录 owner 和 PM2 用户隔离配置，当前不作为默认工作流。
+
+## 远程环境初始化
+
+远程命令会先执行 `envInit`，默认会尝试加载 `/etc/profile` 和 `~/.nvm/nvm.sh`，用于兼容通过 nvm 安装的 Node.js/PM2。默认初始化命令带有兜底逻辑，即使服务器没有 nvm 也不会导致预检失败。
+
+如需覆盖，可在 profile 中显式配置：
+
+```json
+"envInit": [
+  "source /etc/profile",
+  "source ~/.nvm/nvm.sh"
+]
+```
 
 ## 查看 profiles
 
